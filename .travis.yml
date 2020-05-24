@@ -23,6 +23,10 @@ install:
     pip install -r fwtool/requirements.txt
     export PYTHONPATH=`pwd`/fwtool:$PYTHONPATH
 
+  - |
+    # Install dependencies
+    pip install -r requirements.txt
+
 before_script:
   - |
     # Decrypt firmware files
