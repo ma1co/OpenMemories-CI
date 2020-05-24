@@ -1,0 +1,34 @@
+dist: bionic
+language: python
+python: 3.8
+
+env:
+  global:
+    - secure: "VXzTJfFcPISO/Ue7+tejVBwUzaqeDv1lMqbGi6o71XsjC5t9AfmwtfSHhRuz3nHNgALBzAgq6Wev9DtWbb539LngZIPOS6sYQtxFbcJ7hijUH9jFwReUynqYYeZSztV2oYtXXa7Cw3J1HjJ7TEiob7XECZBt7OyR+qeEwcCpSgDs5pzUnQ7r5lOYTQjg6+EOsKUG5hdtmKI1Qo6nDvhdeBm1XRw0P2oSBWXYsBs6N9JlQzzLldJBZUdGtgnKMf4sT6WBb4hGEZvH0/J5PF/zwK4rpxV/Znn2Gfp8sFkj3vQNQaVwvPwg96iO68gyS2T74/jyS0LP3jA3IAZq50t3jq9IWO0N3ASTcEGaCIgb/mCPI8YLxIg939xXKZzadMv+6GdbRy5j0EIVlrZj6sjAGoVdSexMUWy8Fe4xpkishl+UNKR2ibzrhCMPjxmoUlFHXqUw4wp5Wg/j4itsCtYbgOf5dqJQByYs6v2BFdc0AvzBUFSOQ1tLNn/iV35L5cS3ii9+a7wtXjjmij7zyg/76U0FJhhZCYW92AdlIUKbaWt84H4WLLtxO3Nnk9pHj9vyxpBzKyRHxsAza6dfkFKPZQ44WpB2UKF+Yka6MDE8qt6aRFjpmNJoNtmwconCqXvnBlirGJRW9CJL42xDZwScJGyv+KVq8b33eVBwhbjhbfc="
+
+install:
+  - |
+    # Install qemu
+    git clone --depth=1 https://github.com/ma1co/qemu.git qemu
+    cd qemu
+    git submodule update --init --recursive capstone dtc ui/keycodemapdb
+    ./configure --target-list=arm-softmmu --disable-docs --disable-tools --disable-user
+    make -j3
+    cd ..
+    export PATH=`pwd`/qemu/arm-softmmu:$PATH
+
+  - |
+    # Install fwtool
+    git clone --depth=1 https://github.com/ma1co/fwtool.py.git fwtool
+    pip install -r fwtool/requirements.txt
+    export PYTHONPATH=`pwd`/fwtool:$PYTHONPATH
+
+before_script:
+  - |
+    # Decrypt firmware files
+    for f in $(find firmware -type f -name '*.enc'); do
+      openssl aes-256-cbc -d -k "$FIRMWARE_KEY" -in $f -out ${f%.enc}
+    done
+
+script:
+  - python -m unittest discover -q -t . -s tests
