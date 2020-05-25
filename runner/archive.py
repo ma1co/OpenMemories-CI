@@ -2,6 +2,7 @@ import io
 import stat
 
 from fwtool.archive import cramfs, fat, UnixFile
+from fwtool.sony import flash
 
 class Archive:
  def __init__(self, files={}):
@@ -22,10 +23,20 @@ class Archive:
 def readFat(data):
  return Archive(fat.readFat(io.BytesIO(data)))
 
+def writeFat(archive, size):
+ f = io.BytesIO()
+ fat.writeFat(archive.files.values(), size, f)
+ return f.getvalue()
+
 def readCramfs(data):
  return Archive(cramfs.readCramfs(io.BytesIO(data)))
 
 def writeCramfs(archive):
  f = io.BytesIO()
  cramfs.writeCramfs(archive.files.values(), f)
+ return f.getvalue()
+
+def writeFlash(partitions):
+ f = io.BytesIO()
+ flash.writePartitions([io.BytesIO(p) for p in partitions], f)
  return f.getvalue()

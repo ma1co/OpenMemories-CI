@@ -1,6 +1,7 @@
 import logging
 import queue
 import subprocess
+import sys
 import threading
 
 class SubprocessRunner:
@@ -46,3 +47,8 @@ class SubprocessRunner:
 
  def __exit__(self, type, value, traceback):
   self.finish()
+
+
+class PythonRunner(SubprocessRunner):
+ def __init__(self, script, args=[], timeout=10):
+  super().__init__(name=script, args=[sys.executable, '-u', '-m', script]+args, timeout=timeout)

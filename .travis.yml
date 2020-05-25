@@ -24,6 +24,12 @@ install:
     export PYTHONPATH=`pwd`/fwtool:$PYTHONPATH
 
   - |
+    # Install pmca-re
+    git clone --depth=1 https://github.com/ma1co/Sony-PMCA-RE.git pmca
+    pip install -r pmca/requirements.txt
+    export PYTHONPATH=`pwd`/pmca:$PYTHONPATH
+
+  - |
     # Install dependencies
     pip install -r requirements.txt
 
