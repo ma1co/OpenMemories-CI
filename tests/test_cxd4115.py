@@ -46,7 +46,7 @@ class TestCXD4115(TestCase):
   return archive.writeFat(nflasha2, 0x400000)
 
  def prepareNand(self, partitions=[]):
-  return onenand.writeNand(archive.writeFlash(partitions), self.NAND_SIZE)
+  return onenand.writeNand(b'', archive.writeFlash(partitions), self.NAND_SIZE)
 
  def prepareQemuArgs(self, kernel=None, initrd=None, nand=None):
   args = []
