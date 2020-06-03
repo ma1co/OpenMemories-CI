@@ -1,3 +1,4 @@
+import os
 import textwrap
 import time
 
@@ -10,38 +11,54 @@ class TestCXD90014(TestCase):
  MODEL = 'DSC-RX100M5'
  FIRMWARE_DIR = 'firmware/DSC-RX100M5'
 
- def readUpdaterPartition(self):
-  with open(self.FIRMWARE_DIR+'/nflasha1', 'rb') as f:
+ def readFirmwareFile(self, name):
+  with open(os.path.join(self.FIRMWARE_DIR, name), 'rb') as f:
    return f.read()
 
- def unpackUpdaterPartition(self):
-  nflasha1 = archive.readFat(self.readUpdaterPartition())
-  kernel = zimage.unpackZimage(nflasha1.read('/boot/vmlinux.bin'))
-  initrd = archive.readCramfs(nflasha1.read('/boot/initrd.img'))
-  return kernel, initrd
+ def prepareUpdaterKernel(self, unpackZimage=False, patchConsoleEnable=False):
+  kernel = archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/vmlinux.bin')
+  if unpackZimage:
+   kernel = zimage.unpackZimage(kernel)
+   if patchConsoleEnable:
+    kernel = kernel.replace(b'amba2.console=0', b'amba2.console=1')
+  return kernel
 
+ def prepareUpdaterInitrd(self, shellOnly=False):
+  initrd = archive.readCramfs(archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/initrd.img'))
+  if shellOnly:
+   initrd.write('/sbin/init', b'#!/bin/sh\nmount -t proc proc /proc\nwhile true; do sh; done\n')
+  return archive.writeCramfs(initrd)
 
- def testUpdaterKernel(self):
-  kernel, initrd = self.unpackUpdaterPartition()
+ def prepareQemuArgs(self, kernel=None, initrd=None):
+  args = []
+  if kernel:
+   args += ['-kernel', kernel]
+  if initrd:
+   args += ['-initrd', initrd]
+  return args
 
-  kernel = kernel.replace(b'amba2.console=0', b'amba2.console=1')
-
-  initrd.write('/sbin/init', b'#!/bin/sh\nmount -t proc proc /proc\nwhile true; do sh; done\n')
-  initrd = archive.writeCramfs(initrd)
-
-  files = {'vmlinux.bin': kernel, 'initrd.img': initrd}
-  args = ['-kernel', 'vmlinux.bin', '-initrd', 'initrd.img']
-
-  with qemu.QemuRunner(self.MACHINE, args, files) as q:
-   q.expectLine(lambda l: l.startswith('BusyBox'))
-   time.sleep(.5)
-
-   cpuinfo = q.execShellCommand('cat /proc/cpuinfo')
+ def checkShell(self, func, checkCpuinfo=True, checkVersion=True):
+  if checkCpuinfo:
+   cpuinfo = func('cat /proc/cpuinfo')
    self.log.info('/proc/cpuinfo:\n%s', textwrap.indent(cpuinfo, '  '))
    if 'Hardware\t: ARM-CXD90014\n' not in cpuinfo:
     raise Exception('Invalid cpuinfo')
 
-   version = q.execShellCommand('cat /proc/version')
+  if checkVersion:
+   version = func('cat /proc/version')
    self.log.info('/proc/version:\n%s', textwrap.indent(version, '  '))
    if not version.startswith('Linux version 3.0'):
     raise Exception('Invalid version')
+
+
+ def testUpdaterKernel(self):
+  files = {
+   'vmlinux.bin': self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+   'initrd.img': self.prepareUpdaterInitrd(shellOnly=True),
+  }
+  args = self.prepareQemuArgs(kernel='vmlinux.bin', initrd='initrd.img')
+
+  with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   q.expectLine(lambda l: l.startswith('BusyBox'))
+   time.sleep(.5)
+   self.checkShell(q.execShellCommand)
