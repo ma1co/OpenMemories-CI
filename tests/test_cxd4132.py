@@ -16,6 +16,9 @@ class TestCXD4132(TestCase):
   with open(os.path.join(self.FIRMWARE_DIR, name), 'rb') as f:
    return f.read()
 
+ def prepareBootRom(self):
+  return self.readFirmwareFile('bootrom')
+
  def prepareBootPartition(self):
   return self.readFirmwareFile('boot')
 
@@ -27,17 +30,13 @@ class TestCXD4132(TestCase):
     kernel = kernel.replace(b'amba2.console=0', b'amba2.console=1')
   return kernel
 
- def prepareUpdaterInitrd(self, shellOnly=False, patchTee=False, patchBackupLoad=False, patchValidBoot=False):
+ def prepareUpdaterInitrd(self, shellOnly=False, patchTee=False):
   initrd = archive.readCramfs(archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/initrd.img'))
   if shellOnly:
    initrd.write('/sbin/init', b'#!/bin/sh\nmount -t proc proc /proc\nwhile true; do sh; done\n')
   else:
    if patchTee:
     initrd.patch('/sbin/init', lambda d: d.replace(b' | tee -a $OUTPUT_LOG', b''))
-   if patchBackupLoad:
-    initrd.patch('/root/insmod.sh', lambda d: d.replace(b'Backup_save=0', b'Backup_load=1 Backup_save=0'))
-   if patchValidBoot:
-    initrd.write('/root/is_valid_boot.sh', b'#!/bin/sh\nexit 0\n')
   return archive.writeCramfs(initrd)
 
  def prepareFlash1(self, kernel=None, initrd=None, patchKernelLoadaddr=False):
@@ -50,7 +49,7 @@ class TestCXD4132(TestCase):
    nflasha1.patch('/boot/loadaddr.txt', lambda d: d.replace(b'0x81808000', b'0x80018000'))
   return archive.writeFat(nflasha1, 0x400000)
 
- def prepareFlash2(self, updaterMode=False):
+ def prepareFlash2(self, updaterMode=False, patchBackupWriteComp=False):
   initrd = archive.readCramfs(archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/initrd.img'))
   nflasha2 = archive.Archive()
   nflasha2.write('/Backup.bin', initrd.read('/root/Backup.bin'))
@@ -59,13 +58,17 @@ class TestCXD4132(TestCase):
   nflasha2.write('/updater/dat4', b'\x00\x01')
   if updaterMode:
    nflasha2.write('/updater/mode', b'')
+  if patchBackupWriteComp:
+   nflasha2.patch('/Backup.bin', lambda d: d[:8] + b'\x01\0\0\0' + d[12:])
   return archive.writeFat(nflasha2, 0x400000)
 
  def prepareNand(self, boot=b'', partitions=[]):
   return onenand.writeNand(boot, archive.writeFlash(partitions), self.NAND_SIZE)
 
- def prepareQemuArgs(self, kernel=None, initrd=None, nand=None, patchLoader2LogLevel=False):
+ def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None, patchLoader2LogLevel=False):
   args = []
+  if bootRom:
+   args += ['-bios', bootRom]
   if kernel:
    args += ['-kernel', kernel]
   if initrd:
@@ -120,6 +123,7 @@ class TestCXD4132(TestCase):
   args = self.prepareQemuArgs(nand='nand.dat', patchLoader2LogLevel=True)
 
   with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   q.expectLine(lambda l: l.startswith('diadem opal Loader2'))
    q.expectLine(lambda l: l.startswith('LDR: Jump to kernel'))
    q.expectLine(lambda l: l.startswith('BusyBox'))
    time.sleep(.5)
@@ -128,13 +132,26 @@ class TestCXD4132(TestCase):
 
  def testUpdaterUsb(self):
   files = {
-   'vmlinux.bin': self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
-   'initrd.img': self.prepareUpdaterInitrd(patchTee=True, patchBackupLoad=True, patchValidBoot=True),
-   'nand.dat': self.prepareNand(partitions=[self.prepareFlash1(), self.prepareFlash2()]),
+   'rom.dat': self.prepareBootRom(),
+   'nand.dat': self.prepareNand(
+    boot=self.prepareBootPartition(),
+    partitions=[
+     self.prepareFlash1(
+      kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+      initrd=self.prepareUpdaterInitrd(patchTee=True),
+      patchKernelLoadaddr=True,
+     ),
+     self.prepareFlash2(updaterMode=True, patchBackupWriteComp=True),
+    ],
+   ),
   }
-  args = self.prepareQemuArgs(kernel='vmlinux.bin', initrd='initrd.img', nand='nand.dat')
+  args = self.prepareQemuArgs(bootRom='rom.dat', nand='nand.dat', patchLoader2LogLevel=True)
 
   with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   q.expectLine(lambda l: l.startswith('opal Loader1'))
+   q.expectLine(lambda l: l.startswith('diadem opal Loader2'))
+   q.expectLine(lambda l: l.startswith('LDR: Jump to kernel'))
+   q.expectLine(lambda l: l.startswith('BusyBox'))
    q.expectLine(lambda l: l.endswith('"DONE onEvent(COMP_START or COMP_STOP)"'))
 
    with usb.PmcaRunner('updatershell', ['-d', 'qemu', '-m', self.MODEL]) as pmca:
