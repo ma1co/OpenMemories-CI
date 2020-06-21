@@ -3,10 +3,11 @@ import textwrap
 import time
 
 from . import TestCase
-from runner import archive, qemu
+from runner import archive, emmc, qemu
 
 class TestCXD90045(TestCase):
  MACHINE = 'cxd90045'
+ EMMC_SIZE = 0x1000000
 
  MODEL = 'DSC-HX99'
  FIRMWARE_DIR = 'firmware/DSC-HX99'
@@ -15,21 +16,59 @@ class TestCXD90045(TestCase):
   with open(os.path.join(self.FIRMWARE_DIR, name), 'rb') as f:
    return f.read()
 
+ def prepareBootRom(self):
+  return self.readFirmwareFile('bootrom')
+
+ def prepareBootPartition(self, patchInitPower=False):
+  boot = self.readFirmwareFile('boot')
+  if patchInitPower:
+   boot = boot[:0x83d8] + b'\0\0\0\0' + boot[0x83dc:]
+   boot = boot[:0x87c4] + b'\0\0\0\0' + boot[0x87c8:]
+  return boot
+
  def prepareUpdaterKernel(self):
   return archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/vmlinux.bin')
 
- def prepareUpdaterInitrd(self, shellOnly=False):
+ def prepareUpdaterInitrd(self, shellOnly=False, patchUpdaterMain=False):
   initrd = archive.readCramfs(archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/initrd.img'))
   if shellOnly:
    initrd.write('/sbin/init', b'#!/bin/sh\nmount -t proc proc /proc\nwhile true; do sh; done\n')
+  else:
+   if patchUpdaterMain:
+    initrd.write('/usr/bin/UdtrMain.sh', b'#!/bin/sh\n')
   return archive.writeCramfs(initrd)
 
- def prepareQemuArgs(self, kernel=None, initrd=None):
+ def prepareFlash1(self, kernel=None, initrd=None, patchConsoleEnable=False):
+  nflasha1 = archive.readFat(self.readFirmwareFile('nflasha1'))
+  if kernel:
+   nflasha1.write('/boot/vmlinux.bin', kernel)
+  if initrd:
+   nflasha1.write('/boot/initrd.img', initrd)
+  if patchConsoleEnable:
+   nflasha1.patch('/boot/kemco.txt', lambda d: d.replace(b'amba2.console=0', b'amba2.console=1'))
+  return archive.writeFat(nflasha1, 0x800000)
+
+ def prepareFlash2(self, updaterMode=False):
+  nflasha2 = archive.Archive()
+  if updaterMode:
+   nflasha2.write('/updater/mode', b'')
+  return archive.writeFat(nflasha2, 0x400000)
+
+ def prepareEmmc(self, boot=b'', partitions=[]):
+  return emmc.writeEmmc(boot, archive.writeFlash(partitions), self.EMMC_SIZE)
+
+ def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, emmc=None, patchLoader2LogLevel=False):
   args = []
+  if bootRom:
+   args += ['-bios', bootRom]
   if kernel:
    args += ['-kernel', kernel]
   if initrd:
    args += ['-initrd', initrd]
+  if emmc:
+   args += ['-drive', 'file=%s,if=mtd,format=raw' % emmc]
+  if patchLoader2LogLevel:
+   args += ['-device', 'rom-loader,name=loader2-loglevel,addr=0xfe188000,data=7,data-len=4']
   return args
 
  def checkShell(self, func, checkCpuinfo=True, checkVersion=True):
@@ -54,6 +93,32 @@ class TestCXD90045(TestCase):
   args = self.prepareQemuArgs(kernel='vmlinux.bin', initrd='initrd.img')
 
   with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   q.expectLine(lambda l: l.startswith('BusyBox'))
+   time.sleep(.5)
+   self.checkShell(q.execShellCommand)
+
+
+ def testLoader1(self):
+  files = {
+   'rom.dat': self.prepareBootRom(),
+   'emmc.dat': self.prepareEmmc(
+    boot=self.prepareBootPartition(patchInitPower=True),
+    partitions=[
+     self.prepareFlash1(
+      kernel=self.prepareUpdaterKernel(),
+      initrd=self.prepareUpdaterInitrd(patchUpdaterMain=True),
+      patchConsoleEnable=True,
+     ),
+     self.prepareFlash2(updaterMode=True),
+    ],
+   ),
+  }
+  args = self.prepareQemuArgs(bootRom='rom.dat', emmc='emmc.dat', patchLoader2LogLevel=True)
+
+  with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   q.expectLine(lambda l: l.startswith('Astra Loader1'))
+   q.expectLine(lambda l: l.startswith('Loader2'))
+   q.expectLine(lambda l: l.startswith('LDR:Jump to kernel'))
    q.expectLine(lambda l: l.startswith('BusyBox'))
    time.sleep(.5)
    self.checkShell(q.execShellCommand)
