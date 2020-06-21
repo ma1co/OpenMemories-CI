@@ -16,6 +16,9 @@ class TestCXD4115(TestCase):
   with open(os.path.join(self.FIRMWARE_DIR, name), 'rb') as f:
    return f.read()
 
+ def prepareBootRom(self):
+  return self.readFirmwareFile('bootrom')
+
  def prepareBootPartition(self, patchInitPower=False, patchLoader3Checksum=False, patchKernelLoadaddr=False):
   boot = self.readFirmwareFile('boot')
   if patchInitPower:
@@ -34,13 +37,11 @@ class TestCXD4115(TestCase):
     kernel = kernel_patch.patchConsoleEnable(kernel)
   return kernel
 
- def prepareUpdaterInitrd(self, shellOnly=False, patchValidBoot=False, patchUpdaterLogLevel=False, patchCasCmd=False):
+ def prepareUpdaterInitrd(self, shellOnly=False, patchUpdaterLogLevel=False, patchCasCmd=False):
   initrd = archive.readCramfs(archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/initrd.img'))
   if shellOnly:
    initrd.write('/sbin/init', b'#!/bin/sh\nmount -t proc proc /proc\nwhile true; do sh; done\n')
   else:
-   if patchValidBoot:
-    initrd.write('/root/is_valid_boot.sh', b'#!/bin/sh\nexit 0\n')
    if patchUpdaterLogLevel:
     initrd.patch('/root/UdtrMain.sh', lambda d: d.replace(b'#!/bin/sh\n', b'#!/bin/sh\ndebugio 5\n'))
    if patchCasCmd:
@@ -65,8 +66,10 @@ class TestCXD4115(TestCase):
  def prepareNand(self, boot=b'', partitions=[]):
   return onenand.writeNand(boot, archive.writeFlash(partitions), self.NAND_SIZE)
 
- def prepareQemuArgs(self, kernel=None, initrd=None, nand=None, patchLoader2TypeId=False):
+ def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None, patchLoader2TypeId=False):
   args = []
+  if bootRom:
+   args += ['-bios', bootRom]
   if kernel:
    args += ['-kernel', kernel]
   if initrd:
@@ -127,13 +130,22 @@ class TestCXD4115(TestCase):
 
  def testUpdaterUsb(self):
   files = {
-   'vmlinux.bin': self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
-   'initrd.img': self.prepareUpdaterInitrd(patchValidBoot=True, patchUpdaterLogLevel=True, patchCasCmd=True),
-   'nand.dat': self.prepareNand(partitions=[self.prepareFlash1(), self.prepareFlash2()]),
+   'rom.dat': self.prepareBootRom(),
+   'nand.dat': self.prepareNand(
+    boot=self.prepareBootPartition(patchInitPower=True, patchLoader3Checksum=True, patchKernelLoadaddr=True),
+    partitions=[
+     self.prepareFlash1(
+      kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+      initrd=self.prepareUpdaterInitrd(patchUpdaterLogLevel=True, patchCasCmd=True),
+     ),
+     self.prepareFlash2(updaterMode=True),
+    ],
+   ),
   }
-  args = self.prepareQemuArgs(kernel='vmlinux.bin', initrd='initrd.img', nand='nand.dat')
+  args = self.prepareQemuArgs(bootRom='rom.dat', nand='nand.dat')
 
   with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   q.expectLine(lambda l: l.startswith('BusyBox'))
    q.expectLine(lambda l: '"DONE onEvent(COMP_START or COMP_STOP)"' in l)
 
    with usb.PmcaRunner('updatershell', ['-d', 'qemu', '-m', self.MODEL]) as pmca:
