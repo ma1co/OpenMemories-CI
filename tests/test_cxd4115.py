@@ -16,6 +16,16 @@ class TestCXD4115(TestCase):
   with open(os.path.join(self.FIRMWARE_DIR, name), 'rb') as f:
    return f.read()
 
+ def prepareBootPartition(self, patchInitPower=False, patchLoader3Checksum=False, patchKernelLoadaddr=False):
+  boot = self.readFirmwareFile('boot')
+  if patchInitPower:
+   boot = boot[:0xa828] + b'\0\0\0\0' + boot[0xa82c:]
+  if patchLoader3Checksum:
+   boot = boot[:0xaadd] + b'\xe0' + boot[0xaade:]
+  if patchKernelLoadaddr:
+   boot = boot[:0x12a8c] + b'\x00\x80\x20\x10' + boot[0x12a90:]
+  return boot
+
  def prepareUpdaterKernel(self, unpackZimage=False, patchConsoleEnable=False):
   kernel = archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/vmlinux')
   if unpackZimage:
@@ -37,18 +47,25 @@ class TestCXD4115(TestCase):
     initrd.patch('/root/UdtrMain.sh', lambda d: d.replace(b'uc_cascmd -m ca -c continu', b'true'))
   return archive.writeCramfs(initrd)
 
- def prepareFlash1(self):
-  return self.readFirmwareFile('nflasha1')
+ def prepareFlash1(self, kernel=None, initrd=None):
+  nflasha1 = archive.readFat(self.readFirmwareFile('nflasha1'))
+  if kernel:
+   nflasha1.write('/boot/vmlinux', kernel)
+  if initrd:
+   nflasha1.write('/boot/initrd.img', initrd)
+  return archive.writeFat(nflasha1, 0x400000)
 
- def prepareFlash2(self):
+ def prepareFlash2(self, updaterMode=False):
   nflasha2 = archive.Archive()
   nflasha2.write('/updater/dat4', b'\x00\x01')
+  if updaterMode:
+   nflasha2.write('/updater/mode', b'')
   return archive.writeFat(nflasha2, 0x400000)
 
- def prepareNand(self, partitions=[]):
-  return onenand.writeNand(b'', archive.writeFlash(partitions), self.NAND_SIZE)
+ def prepareNand(self, boot=b'', partitions=[]):
+  return onenand.writeNand(boot, archive.writeFlash(partitions), self.NAND_SIZE)
 
- def prepareQemuArgs(self, kernel=None, initrd=None, nand=None):
+ def prepareQemuArgs(self, kernel=None, initrd=None, nand=None, patchLoader2TypeId=False):
   args = []
   if kernel:
    args += ['-kernel', kernel]
@@ -56,6 +73,8 @@ class TestCXD4115(TestCase):
    args += ['-initrd', initrd]
   if nand:
    args += ['-drive', 'file=%s,if=mtd,format=raw' % nand]
+  if patchLoader2TypeId:
+   args += ['-device', 'rom-loader,name=loader2-typeid,addr=0xfff07d24,data=1,data-len=4']
   return args
 
  def checkShell(self, func, checkCpuinfo=True, checkVersion=True):
@@ -78,6 +97,27 @@ class TestCXD4115(TestCase):
    'initrd.img': self.prepareUpdaterInitrd(shellOnly=True),
   }
   args = self.prepareQemuArgs(kernel='vmlinux.bin', initrd='initrd.img')
+
+  with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   q.expectLine(lambda l: l.startswith('BusyBox'))
+   time.sleep(.5)
+   self.checkShell(q.execShellCommand)
+
+
+ def testLoader2Updater(self):
+  files = {
+   'nand.dat': self.prepareNand(
+    boot=self.prepareBootPartition(patchInitPower=True, patchLoader3Checksum=True, patchKernelLoadaddr=True),
+    partitions=[
+     self.prepareFlash1(
+      kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+      initrd=self.prepareUpdaterInitrd(shellOnly=True),
+     ),
+     self.prepareFlash2(updaterMode=True),
+    ],
+   ),
+  }
+  args = self.prepareQemuArgs(nand='nand.dat', patchLoader2TypeId=True)
 
   with qemu.QemuRunner(self.MACHINE, args, files) as q:
    q.expectLine(lambda l: l.startswith('BusyBox'))
