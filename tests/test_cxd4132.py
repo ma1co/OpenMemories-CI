@@ -7,7 +7,7 @@ from runner import archive, onenand, qemu, usb, zimage
 
 class TestCXD4132(TestCase):
  MACHINE = 'cxd4132'
- NAND_SIZE = 0x10000000
+ NAND_SIZE = 0x4000000
 
  MODEL = 'DSC-QX10'
  FIRMWARE_DIR = 'firmware/DSC-QX10'

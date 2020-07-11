@@ -7,7 +7,7 @@ from runner import archive, kernel_patch, onenand, qemu, usb, zimage
 
 class TestCXD4115(TestCase):
  MACHINE = 'cxd4115'
- NAND_SIZE = 0x8000000
+ NAND_SIZE = 0x4000000
 
  MODEL = 'NEX-3'
  FIRMWARE_DIR = 'firmware/NEX-3'
