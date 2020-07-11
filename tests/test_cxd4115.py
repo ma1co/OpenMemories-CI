@@ -66,7 +66,7 @@ class TestCXD4115(TestCase):
  def prepareNand(self, boot=b'', partitions=[]):
   return onenand.writeNand(boot, archive.writeFlash(partitions), self.NAND_SIZE)
 
- def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None, patchLoader2TypeId=False):
+ def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None):
   args = []
   if bootRom:
    args += ['-bios', bootRom]
@@ -76,8 +76,6 @@ class TestCXD4115(TestCase):
    args += ['-initrd', initrd]
   if nand:
    args += ['-drive', 'file=%s,if=mtd,format=raw' % nand]
-  if patchLoader2TypeId:
-   args += ['-device', 'rom-loader,name=loader2-typeid,addr=0xfff07d24,data=1,data-len=4']
   return args
 
  def checkShell(self, func, checkCpuinfo=True, checkVersion=True):
@@ -120,7 +118,7 @@ class TestCXD4115(TestCase):
     ],
    ),
   }
-  args = self.prepareQemuArgs(nand='nand.dat', patchLoader2TypeId=True)
+  args = self.prepareQemuArgs(nand='nand.dat')
 
   with qemu.QemuRunner(self.MACHINE, args, files) as q:
    q.expectLine(lambda l: l.startswith('BusyBox'))
