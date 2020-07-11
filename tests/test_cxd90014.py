@@ -106,6 +106,32 @@ class TestCXD90014(TestCase):
    self.checkShell(q.execShellCommand)
 
 
+ def testLoader2Updater(self):
+  files = {
+   'nand.dat': self.prepareNand(
+    safeBoot=self.prepareSafeBootPartition(),
+    normalBoot=self.prepareNormalBootPartition(patchInitPower=True),
+    partitions=[
+     self.prepareFlash1(
+      kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+      initrd=self.prepareUpdaterInitrd(shellOnly=True),
+      patchKernelLoadaddr=True,
+     ),
+     self.prepareFlash2(updaterMode=True),
+    ],
+   ),
+  }
+  args = self.prepareQemuArgs(nand='nand.dat', patchLoader2LogLevel=True)
+
+  with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   q.expectLine(lambda l: l.startswith('Loader2'))
+   q.expectLine(lambda l: l.startswith('Loader3'))
+   q.expectLine(lambda l: l.startswith('LDR:Jump to kernel'))
+   q.expectLine(lambda l: l.startswith('BusyBox'))
+   time.sleep(.5)
+   self.checkShell(q.execShellCommand)
+
+
  def testLoader1(self):
   files = {
    'rom.dat': self.prepareBootRom(),
