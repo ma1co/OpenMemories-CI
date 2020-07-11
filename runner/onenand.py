@@ -9,6 +9,7 @@ SECTORS_PER_BLOCK = 0x100
 def writeNand(boot, data, size):
  numBlocks = size // SECTOR_SIZE // SECTORS_PER_BLOCK
  bootBlocks = (len(boot) + SECTORS_PER_BLOCK * SECTOR_SIZE - 1) // SECTOR_SIZE // SECTORS_PER_BLOCK
+ dataBlocks = (len(data) + SECTORS_PER_BLOCK * SECTOR_SIZE - 1) // SECTOR_SIZE // SECTORS_PER_BLOCK
 
  f = io.BytesIO()
  f.write(boot)
@@ -23,7 +24,7 @@ def writeNand(boot, data, size):
    if i < bootBlocks:
     if i == 0 and j == 0:
      bootMarker = 0x5555
-   else:
+   elif i < bootBlocks + dataBlocks:
     if j == 0 or j == 1:
      marker = 0
     elif j == 2:
