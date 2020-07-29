@@ -67,7 +67,7 @@ class TestCXD4115(TestCase):
   return onenand.writeNand(boot, archive.writeFlash(partitions), self.NAND_SIZE)
 
  def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None):
-  args = []
+  args = ['-icount', 'shift=4']
   if bootRom:
    args += ['-bios', bootRom]
   if kernel:

@@ -28,7 +28,7 @@ class TestCXD4108(TestCase):
   return archive.writeCramfs(initrd)
 
  def prepareQemuArgs(self, kernel=None, initrd=None):
-  args = []
+  args = ['-icount', 'shift=4']
   if kernel:
    args += ['-kernel', kernel]
   if initrd:

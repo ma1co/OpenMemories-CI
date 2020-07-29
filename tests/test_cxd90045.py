@@ -58,7 +58,7 @@ class TestCXD90045(TestCase):
   return emmc.writeEmmc(boot, archive.writeFlash(partitions), self.EMMC_SIZE)
 
  def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, emmc=None, patchLoader2LogLevel=False):
-  args = []
+  args = ['-icount', 'shift=2']
   if bootRom:
    args += ['-bios', bootRom]
   if kernel:
