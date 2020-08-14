@@ -21,10 +21,12 @@ def writeNand(boot, data, size):
   for j in range(SECTORS_PER_BLOCK):
    marker = 0xffff
    bootMarker = 0xffff
-   if i < bootBlocks:
-    if i == 0 and j == 0:
+   if i == 0 and i < bootBlocks:
+    if j == 0:
      bootMarker = 0x5555
-   elif i < bootBlocks + dataBlocks:
+    elif j == 3:
+     bootMarker = 0xaaaa
+   elif bootBlocks <= i < bootBlocks + dataBlocks:
     if j == 0 or j == 1:
      marker = 0
     elif j == 2:
