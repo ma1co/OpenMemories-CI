@@ -16,6 +16,12 @@ class TestCXD4108(TestCase):
   with open(os.path.join(self.FIRMWARE_DIR, name), 'rb') as f:
    return f.read()
 
+ def prepareBootRom(self, patchLoader2Checksum=False):
+  bootrom = self.readFirmwareFile('bootrom')
+  if patchLoader2Checksum:
+   bootrom = bootrom[:0x8fc] + b'\0\0\0\0' + bootrom[0x900:]
+  return bootrom
+
  def prepareBootPartition(self, patchInitPower=False):
   boot = self.readFirmwareFile('boot')
   if patchInitPower:
@@ -51,8 +57,10 @@ class TestCXD4108(TestCase):
  def prepareNand(self, boot=b'', partitions=[]):
   return onenand.writeNand(boot, archive.writeFlash(partitions), self.NAND_SIZE)
 
- def prepareQemuArgs(self, kernel=None, initrd=None, nand=None):
+ def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None):
   args = ['-icount', 'shift=4']
+  if bootRom:
+   args += ['-bios', bootRom]
   if kernel:
    args += ['-kernel', kernel]
   if initrd:
@@ -102,6 +110,28 @@ class TestCXD4108(TestCase):
    ),
   }
   args = self.prepareQemuArgs(nand='nand.dat')
+
+  with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   q.expectLine(lambda l: l.startswith('BusyBox'))
+   time.sleep(.5)
+   self.checkShell(q.execShellCommand)
+
+
+ def testLoader1Updater(self):
+  files = {
+   'rom.dat': self.prepareBootRom(patchLoader2Checksum=True),
+   'nand.dat': self.prepareNand(
+    boot=self.prepareBootPartition(patchInitPower=True),
+    partitions=[
+     self.prepareFlash1(
+      kernel=self.prepareUpdaterKernel(),
+      initrd=self.prepareUpdaterInitrd(),
+     ),
+     self.prepareFlash2(updaterMode=True),
+    ],
+   ),
+  }
+  args = self.prepareQemuArgs(bootRom='rom.dat', nand='nand.dat')
 
   with qemu.QemuRunner(self.MACHINE, args, files) as q:
    q.expectLine(lambda l: l.startswith('BusyBox'))
