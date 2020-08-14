@@ -98,6 +98,30 @@ class TestCXD90045(TestCase):
    self.checkShell(q.execShellCommand)
 
 
+ def testLoader2Updater(self):
+  files = {
+   'emmc.dat': self.prepareEmmc(
+    boot=self.prepareBootPartition(patchInitPower=True),
+    partitions=[
+     self.prepareFlash1(
+      kernel=self.prepareUpdaterKernel(),
+      initrd=self.prepareUpdaterInitrd(patchUpdaterMain=True),
+      patchConsoleEnable=True,
+     ),
+     self.prepareFlash2(updaterMode=True),
+    ],
+   ),
+  }
+  args = self.prepareQemuArgs(emmc='emmc.dat', patchLoader2LogLevel=True)
+
+  with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   q.expectLine(lambda l: l.startswith('Loader2'))
+   q.expectLine(lambda l: l.startswith('LDR:Jump to kernel'))
+   q.expectLine(lambda l: l.startswith('BusyBox'))
+   time.sleep(.5)
+   self.checkShell(q.execShellCommand)
+
+
  def testLoader1(self):
   files = {
    'rom.dat': self.prepareBootRom(),
