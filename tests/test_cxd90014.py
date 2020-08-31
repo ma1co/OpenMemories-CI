@@ -3,7 +3,7 @@ import textwrap
 import time
 
 from . import TestCase
-from runner import archive, nand, qemu, zimage
+from runner import archive, nand, qemu, usb, zimage
 
 class TestCXD90014(TestCase):
  MACHINE = 'cxd90014'
@@ -37,13 +37,10 @@ class TestCXD90014(TestCase):
     kernel = kernel.replace(b'amba2.console=0', b'amba2.console=1')
   return kernel
 
- def prepareUpdaterInitrd(self, shellOnly=False, patchUpdaterMain=False):
+ def prepareUpdaterInitrd(self, shellOnly=False):
   initrd = archive.readCramfs(archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/initrd.img'))
   if shellOnly:
    initrd.write('/sbin/init', b'#!/bin/sh\nmount -t proc proc /proc\nwhile true; do sh; done\n')
-  else:
-   if patchUpdaterMain:
-    initrd.write('/usr/bin/UdtrMain.sh', b'#!/bin/sh\n')
   return archive.writeCramfs(initrd)
 
  def prepareFlash1(self, kernel=None, initrd=None, patchKernelLoadaddr=False):
@@ -56,10 +53,16 @@ class TestCXD90014(TestCase):
    nflasha1.patch('/boot/loadaddr.txt', lambda d: d.replace(b'0x81528000', b'0x80038000'))
   return archive.writeFat(nflasha1, 0x800000)
 
- def prepareFlash2(self, updaterMode=False):
+ def prepareFlash2(self, updaterMode=False, patchBackupWriteComp=False):
   nflasha2 = archive.Archive()
+  nflasha2.write('/Backup.bin', self.readFirmwareFile('Backup.bin'))
+  nflasha2.write('/DmmConfig.bin', self.readFirmwareFile('DmmConfig.bin'))
+  nflasha2.write('/ulogio.bin', self.readFirmwareFile('ulogio.bin'))
+  nflasha2.write('/updater/dat4', b'\x00\x01')
   if updaterMode:
    nflasha2.write('/updater/mode', b'')
+  if patchBackupWriteComp:
+   nflasha2.patch('/Backup.bin', lambda d: d[:8] + b'\x01\0\0\0' + d[12:])
   return archive.writeFat(nflasha2, 0x400000)
 
  def prepareNand(self, safeBoot=b'', normalBoot=b'', partitions=[]):
@@ -132,7 +135,7 @@ class TestCXD90014(TestCase):
    self.checkShell(q.execShellCommand)
 
 
- def testLoader1(self):
+ def testUpdaterUsb(self):
   files = {
    'rom.dat': self.prepareBootRom(),
    'nand.dat': self.prepareNand(
@@ -141,10 +144,10 @@ class TestCXD90014(TestCase):
     partitions=[
      self.prepareFlash1(
       kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
-      initrd=self.prepareUpdaterInitrd(patchUpdaterMain=True),
+      initrd=self.prepareUpdaterInitrd(),
       patchKernelLoadaddr=True,
      ),
-     self.prepareFlash2(updaterMode=True),
+     self.prepareFlash2(updaterMode=True, patchBackupWriteComp=True),
     ],
    ),
   }
@@ -156,5 +159,12 @@ class TestCXD90014(TestCase):
    q.expectLine(lambda l: l.startswith('Loader3'))
    q.expectLine(lambda l: l.startswith('LDR:Jump to kernel'))
    q.expectLine(lambda l: l.startswith('BusyBox'))
-   time.sleep(.5)
-   self.checkShell(q.execShellCommand)
+   q.expectLine(lambda l: l.endswith('"DONE onEvent(COMP_START or COMP_STOP)"'))
+
+   with usb.PmcaRunner('updatershell', ['-d', 'qemu', '-m', self.MODEL]) as pmca:
+    pmca.expectLine(lambda l: l == 'Welcome to the USB debug shell.')
+    self.checkShell(lambda c: pmca.execUpdaterShellCommand('shell %s' % c))
+    pmca.writeLine('exit')
+    pmca.expectLine(lambda l: l == '>Done')
+
+   q.expectLine(lambda l: l == 'User Update OK')
