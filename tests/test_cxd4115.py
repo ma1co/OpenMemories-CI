@@ -19,10 +19,8 @@ class TestCXD4115(TestCase):
  def prepareBootRom(self):
   return self.readFirmwareFile('bootrom')
 
- def prepareBootPartition(self, patchInitPower=False, patchLoader3Checksum=False, patchKernelLoadaddr=False):
+ def prepareBootPartition(self, patchLoader3Checksum=False, patchKernelLoadaddr=False):
   boot = self.readFirmwareFile('boot')
-  if patchInitPower:
-   boot = boot[:0xa828] + b'\0\0\0\0' + boot[0xa82c:]
   if patchLoader3Checksum:
    boot = boot[:0xaadd] + b'\xe0' + boot[0xaade:]
   if patchKernelLoadaddr:
@@ -68,6 +66,10 @@ class TestCXD4115(TestCase):
 
  def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None):
   args = ['-icount', 'shift=4']
+
+  # Power IC
+  args += ['-device', 'bionz_ca,id=ca,bus=/sio3', '-connect-gpio', 'odev=ca,oname=req,idev=gpio0,inum=15']
+
   if bootRom:
    args += ['-bios', bootRom]
   if kernel:
@@ -108,7 +110,7 @@ class TestCXD4115(TestCase):
  def testLoader2Updater(self):
   files = {
    'nand.dat': self.prepareNand(
-    boot=self.prepareBootPartition(patchInitPower=True, patchLoader3Checksum=True, patchKernelLoadaddr=True),
+    boot=self.prepareBootPartition(patchLoader3Checksum=True, patchKernelLoadaddr=True),
     partitions=[
      self.prepareFlash1(
       kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
@@ -130,7 +132,7 @@ class TestCXD4115(TestCase):
   files = {
    'rom.dat': self.prepareBootRom(),
    'nand.dat': self.prepareNand(
-    boot=self.prepareBootPartition(patchInitPower=True, patchLoader3Checksum=True, patchKernelLoadaddr=True),
+    boot=self.prepareBootPartition(patchLoader3Checksum=True, patchKernelLoadaddr=True),
     partitions=[
      self.prepareFlash1(
       kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),

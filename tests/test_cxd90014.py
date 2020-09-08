@@ -22,12 +22,8 @@ class TestCXD90014(TestCase):
  def prepareSafeBootPartition(self):
   return nand.writeNandBlock0(self.NAND_SIZE) + self.readFirmwareFile('boot1')
 
- def prepareNormalBootPartition(self, patchInitPower=False):
-  b5 = self.readFirmwareFile('boot5')
-  if patchInitPower:
-   b5 = b5[:0xccf0] + b'\0\0\0\0' + b5[0xccf4:]
-   b5 = b5[:0xd1a4] + b'\0\0\0\0' + b5[0xd1a8:]
-  return 3 * 0x40 * 0x1000 * b'\xff' + b5
+ def prepareNormalBootPartition(self):
+  return 3 * 0x40 * 0x1000 * b'\xff' + self.readFirmwareFile('boot5')
 
  def prepareUpdaterKernel(self, unpackZimage=False, patchConsoleEnable=False):
   kernel = archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/vmlinux.bin')
@@ -70,6 +66,11 @@ class TestCXD90014(TestCase):
 
  def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None, patchLoader2LogLevel=False):
   args = ['-icount', 'shift=2']
+
+  # Power IC
+  args += ['-device', 'bionz_hibari,id=hibari,bus=/sio1', '-connect-gpio', 'odev=gpio5,onum=18,idev=hibari,iname=ssi-gpio-cs']
+  args += ['-device', 'bionz_piroshki,id=piroshki,bus=/sio1', '-connect-gpio', 'odev=gpio1,onum=3,idev=piroshki,iname=ssi-gpio-cs']
+
   if bootRom:
    args += ['-bios', bootRom]
   if kernel:
@@ -113,14 +114,14 @@ class TestCXD90014(TestCase):
   files = {
    'nand.dat': self.prepareNand(
     safeBoot=self.prepareSafeBootPartition(),
-    normalBoot=self.prepareNormalBootPartition(patchInitPower=True),
+    normalBoot=self.prepareNormalBootPartition(),
     partitions=[
      self.prepareFlash1(
       kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
       initrd=self.prepareUpdaterInitrd(shellOnly=True),
       patchKernelLoadaddr=True,
      ),
-     self.prepareFlash2(updaterMode=True),
+     self.prepareFlash2(updaterMode=True, patchBackupWriteComp=True),
     ],
    ),
   }
@@ -140,7 +141,7 @@ class TestCXD90014(TestCase):
    'rom.dat': self.prepareBootRom(),
    'nand.dat': self.prepareNand(
     safeBoot=self.prepareSafeBootPartition(),
-    normalBoot=self.prepareNormalBootPartition(patchInitPower=True),
+    normalBoot=self.prepareNormalBootPartition(),
     partitions=[
      self.prepareFlash1(
       kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),

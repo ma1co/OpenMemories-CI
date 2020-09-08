@@ -22,7 +22,6 @@ class TestCXD90045(TestCase):
  def prepareBootPartition(self, patchInitPower=False):
   boot = self.readFirmwareFile('boot')
   if patchInitPower:
-   boot = boot[:0x83d8] + b'\0\0\0\0' + boot[0x83dc:]
    boot = boot[:0x87c4] + b'\0\0\0\0' + boot[0x87c8:]
   return boot
 
@@ -59,6 +58,11 @@ class TestCXD90045(TestCase):
 
  def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, emmc=None, patchLoader2LogLevel=False):
   args = ['-icount', 'shift=2']
+
+  # Power IC
+  args += ['-device', 'bionz_hibari,id=hibari,bus=/sio3', '-connect-gpio', 'odev=gpio5,onum=14,idev=hibari,iname=ssi-gpio-cs']
+  args += ['-device', 'bionz_piroshki,id=piroshki,bus=/sio1', '-connect-gpio', 'odev=gpio5,onum=6,idev=piroshki,iname=ssi-gpio-cs']
+
   if bootRom:
    args += ['-bios', bootRom]
   if kernel:

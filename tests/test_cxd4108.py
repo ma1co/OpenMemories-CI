@@ -16,17 +16,11 @@ class TestCXD4108(TestCase):
   with open(os.path.join(self.FIRMWARE_DIR, name), 'rb') as f:
    return f.read()
 
- def prepareBootRom(self, patchLoader2Checksum=False):
-  bootrom = self.readFirmwareFile('bootrom')
-  if patchLoader2Checksum:
-   bootrom = bootrom[:0x8fc] + b'\0\0\0\0' + bootrom[0x900:]
-  return bootrom
+ def prepareBootRom(self):
+  return self.readFirmwareFile('bootrom')
 
- def prepareBootPartition(self, patchInitPower=False):
-  boot = self.readFirmwareFile('boot')
-  if patchInitPower:
-   boot = boot[:0x40020] + b'\0\0\0\0' + boot[0x40024:]
-  return boot
+ def prepareBootPartition(self):
+  return self.readFirmwareFile('boot')
 
  def prepareUpdaterKernel(self, unpackZimage=False):
   kernel = archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/vmlinux')
@@ -59,6 +53,10 @@ class TestCXD4108(TestCase):
 
  def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None):
   args = ['-icount', 'shift=4']
+
+  # Power IC
+  args += ['-device', 'bionz_mb89083,id=mb89083,bus=/sio0', '-connect-gpio', 'odev=gpio1,onum=1,idev=mb89083,iname=ssi-gpio-cs']
+
   if bootRom:
    args += ['-bios', bootRom]
   if kernel:
@@ -99,7 +97,7 @@ class TestCXD4108(TestCase):
  def testLoader2Updater(self):
   files = {
    'nand.dat': self.prepareNand(
-    boot=self.prepareBootPartition(patchInitPower=True),
+    boot=self.prepareBootPartition(),
     partitions=[
      self.prepareFlash1(
       kernel=self.prepareUpdaterKernel(),
@@ -119,9 +117,9 @@ class TestCXD4108(TestCase):
 
  def testLoader1Updater(self):
   files = {
-   'rom.dat': self.prepareBootRom(patchLoader2Checksum=True),
+   'rom.dat': self.prepareBootRom(),
    'nand.dat': self.prepareNand(
-    boot=self.prepareBootPartition(patchInitPower=True),
+    boot=self.prepareBootPartition(),
     partitions=[
      self.prepareFlash1(
       kernel=self.prepareUpdaterKernel(),

@@ -67,6 +67,11 @@ class TestCXD4132(TestCase):
 
  def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None, patchLoader2LogLevel=False):
   args = ['-icount', 'shift=3']
+
+  # Power IC
+  args += ['-device', 'bionz_hibari,id=hibari,bus=/sio1', '-connect-gpio', 'odev=gpio5,onum=10,idev=hibari,iname=ssi-gpio-cs']
+  args += ['-device', 'bionz_piroshki,id=piroshki,bus=/sio1', '-connect-gpio', 'odev=gpio5,onum=14,idev=piroshki,iname=ssi-gpio-cs']
+
   if bootRom:
    args += ['-bios', bootRom]
   if kernel:
