@@ -109,7 +109,7 @@ class TestCXD4108(TestCase):
   }
   args = self.prepareQemuArgs(nand='nand.dat')
 
-  with qemu.QemuRunner(self.MACHINE, args, files) as q:
+  with qemu.QemuRunner(self.MACHINE, args, files, timeout=45) as q:
    q.expectLine(lambda l: l.startswith('BusyBox'))
    time.sleep(.5)
    self.checkShell(q.execShellCommand)
@@ -131,7 +131,7 @@ class TestCXD4108(TestCase):
   }
   args = self.prepareQemuArgs(bootRom='rom.dat', nand='nand.dat')
 
-  with qemu.QemuRunner(self.MACHINE, args, files) as q:
+  with qemu.QemuRunner(self.MACHINE, args, files, timeout=45) as q:
    q.expectLine(lambda l: l.startswith('BusyBox'))
    time.sleep(.5)
    self.checkShell(q.execShellCommand)
