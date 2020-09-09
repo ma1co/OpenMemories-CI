@@ -22,12 +22,10 @@ class TestCXD4132(TestCase):
  def prepareBootPartition(self):
   return self.readFirmwareFile('boot')
 
- def prepareUpdaterKernel(self, unpackZimage=False, patchConsoleEnable=False):
+ def prepareUpdaterKernel(self, patchConsoleEnable=False):
   kernel = archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/vmlinux')
-  if unpackZimage:
-   kernel = zimage.unpackZimage(kernel)
-   if patchConsoleEnable:
-    kernel = kernel.replace(b'amba2.console=0', b'amba2.console=1')
+  if patchConsoleEnable:
+   kernel = zimage.patchZimage(kernel, lambda k: k.replace(b'amba2.console=0', b'amba2.console=1'))
   return kernel
 
  def prepareUpdaterInitrd(self, shellOnly=False, patchTee=False):
@@ -39,14 +37,12 @@ class TestCXD4132(TestCase):
     initrd.patch('/sbin/init', lambda d: d.replace(b' | tee -a $OUTPUT_LOG', b''))
   return archive.writeCramfs(initrd)
 
- def prepareFlash1(self, kernel=None, initrd=None, patchKernelLoadaddr=False):
+ def prepareFlash1(self, kernel=None, initrd=None):
   nflasha1 = archive.readFat(self.readFirmwareFile('nflasha1'))
   if kernel:
    nflasha1.write('/boot/vmlinux', kernel)
   if initrd:
    nflasha1.write('/boot/initrd.img', initrd)
-  if patchKernelLoadaddr:
-   nflasha1.patch('/boot/loadaddr.txt', lambda d: d.replace(b'0x81808000', b'0x80018000'))
   return archive.writeFat(nflasha1, 0x400000)
 
  def prepareFlash2(self, updaterMode=False, patchBackupWriteComp=False):
@@ -100,7 +96,7 @@ class TestCXD4132(TestCase):
 
  def testUpdaterKernel(self):
   files = {
-   'vmlinux.bin': self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+   'vmlinux.bin': self.prepareUpdaterKernel(patchConsoleEnable=True),
    'initrd.img': self.prepareUpdaterInitrd(shellOnly=True),
   }
   args = self.prepareQemuArgs(kernel='vmlinux.bin', initrd='initrd.img')
@@ -117,9 +113,8 @@ class TestCXD4132(TestCase):
     boot=self.prepareBootPartition(),
     partitions=[
      self.prepareFlash1(
-      kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+      kernel=self.prepareUpdaterKernel(patchConsoleEnable=True),
       initrd=self.prepareUpdaterInitrd(shellOnly=True),
-      patchKernelLoadaddr=True,
      ),
      self.prepareFlash2(updaterMode=True),
     ],
@@ -142,9 +137,8 @@ class TestCXD4132(TestCase):
     boot=self.prepareBootPartition(),
     partitions=[
      self.prepareFlash1(
-      kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+      kernel=self.prepareUpdaterKernel(patchConsoleEnable=True),
       initrd=self.prepareUpdaterInitrd(patchTee=True),
-      patchKernelLoadaddr=True,
      ),
      self.prepareFlash2(updaterMode=True, patchBackupWriteComp=True),
     ],

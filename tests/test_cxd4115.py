@@ -19,20 +19,13 @@ class TestCXD4115(TestCase):
  def prepareBootRom(self):
   return self.readFirmwareFile('bootrom')
 
- def prepareBootPartition(self, patchLoader3Checksum=False, patchKernelLoadaddr=False):
-  boot = self.readFirmwareFile('boot')
-  if patchLoader3Checksum:
-   boot = boot[:0xaadd] + b'\xe0' + boot[0xaade:]
-  if patchKernelLoadaddr:
-   boot = boot[:0x12a8c] + b'\x00\x80\x20\x10' + boot[0x12a90:]
-  return boot
+ def prepareBootPartition(self):
+  return self.readFirmwareFile('boot')
 
- def prepareUpdaterKernel(self, unpackZimage=False, patchConsoleEnable=False):
+ def prepareUpdaterKernel(self, patchConsoleEnable=False):
   kernel = archive.readFat(self.readFirmwareFile('nflasha1')).read('/boot/vmlinux')
-  if unpackZimage:
-   kernel = zimage.unpackZimage(kernel)
-   if patchConsoleEnable:
-    kernel = kernel_patch.patchConsoleEnable(kernel)
+  if patchConsoleEnable:
+   kernel = zimage.patchZimage(kernel, kernel_patch.patchConsoleEnable)
   return kernel
 
  def prepareUpdaterInitrd(self, shellOnly=False, patchUpdaterLogLevel=False, patchCasCmd=False):
@@ -96,7 +89,7 @@ class TestCXD4115(TestCase):
 
  def testUpdaterKernel(self):
   files = {
-   'vmlinux.bin': self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+   'vmlinux.bin': self.prepareUpdaterKernel(patchConsoleEnable=True),
    'initrd.img': self.prepareUpdaterInitrd(shellOnly=True),
   }
   args = self.prepareQemuArgs(kernel='vmlinux.bin', initrd='initrd.img')
@@ -110,10 +103,10 @@ class TestCXD4115(TestCase):
  def testLoader2Updater(self):
   files = {
    'nand.dat': self.prepareNand(
-    boot=self.prepareBootPartition(patchLoader3Checksum=True, patchKernelLoadaddr=True),
+    boot=self.prepareBootPartition(),
     partitions=[
      self.prepareFlash1(
-      kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+      kernel=self.prepareUpdaterKernel(patchConsoleEnable=True),
       initrd=self.prepareUpdaterInitrd(shellOnly=True),
      ),
      self.prepareFlash2(updaterMode=True),
@@ -132,10 +125,10 @@ class TestCXD4115(TestCase):
   files = {
    'rom.dat': self.prepareBootRom(),
    'nand.dat': self.prepareNand(
-    boot=self.prepareBootPartition(patchLoader3Checksum=True, patchKernelLoadaddr=True),
+    boot=self.prepareBootPartition(),
     partitions=[
      self.prepareFlash1(
-      kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+      kernel=self.prepareUpdaterKernel(patchConsoleEnable=True),
       initrd=self.prepareUpdaterInitrd(patchUpdaterLogLevel=True, patchCasCmd=True),
      ),
      self.prepareFlash2(updaterMode=True),

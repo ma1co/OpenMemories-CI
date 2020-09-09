@@ -31,6 +31,9 @@ class TestCXD90014(TestCase):
    kernel = zimage.unpackZimage(kernel)
    if patchConsoleEnable:
     kernel = kernel.replace(b'amba2.console=0', b'amba2.console=1')
+  else:
+   if patchConsoleEnable:
+    kernel = zimage.patchZimage(kernel, lambda k: k.replace(b'amba2.console=0', b'amba2.console=1'))
   return kernel
 
  def prepareUpdaterInitrd(self, shellOnly=False):
@@ -39,14 +42,12 @@ class TestCXD90014(TestCase):
    initrd.write('/sbin/init', b'#!/bin/sh\nmount -t proc proc /proc\nwhile true; do sh; done\n')
   return archive.writeCramfs(initrd)
 
- def prepareFlash1(self, kernel=None, initrd=None, patchKernelLoadaddr=False):
+ def prepareFlash1(self, kernel=None, initrd=None):
   nflasha1 = archive.readFat(self.readFirmwareFile('nflasha1'))
   if kernel:
    nflasha1.write('/boot/vmlinux.bin', kernel)
   if initrd:
    nflasha1.write('/boot/initrd.img', initrd)
-  if patchKernelLoadaddr:
-   nflasha1.patch('/boot/loadaddr.txt', lambda d: d.replace(b'0x81528000', b'0x80038000'))
   return archive.writeFat(nflasha1, 0x800000)
 
  def prepareFlash2(self, updaterMode=False, patchBackupWriteComp=False):
@@ -117,9 +118,8 @@ class TestCXD90014(TestCase):
     normalBoot=self.prepareNormalBootPartition(),
     partitions=[
      self.prepareFlash1(
-      kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+      kernel=self.prepareUpdaterKernel(patchConsoleEnable=True),
       initrd=self.prepareUpdaterInitrd(shellOnly=True),
-      patchKernelLoadaddr=True,
      ),
      self.prepareFlash2(updaterMode=True, patchBackupWriteComp=True),
     ],
@@ -144,9 +144,8 @@ class TestCXD90014(TestCase):
     normalBoot=self.prepareNormalBootPartition(),
     partitions=[
      self.prepareFlash1(
-      kernel=self.prepareUpdaterKernel(unpackZimage=True, patchConsoleEnable=True),
+      kernel=self.prepareUpdaterKernel(patchConsoleEnable=True),
       initrd=self.prepareUpdaterInitrd(),
-      patchKernelLoadaddr=True,
      ),
      self.prepareFlash2(updaterMode=True, patchBackupWriteComp=True),
     ],
