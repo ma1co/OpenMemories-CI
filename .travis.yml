@@ -16,7 +16,6 @@ install:
     # Install qemu
     git clone --depth=1 https://github.com/ma1co/qemu.git qemu
     cd qemu
-    git submodule update --init --recursive capstone dtc ui/keycodemapdb
     ./configure --target-list=arm-softmmu --disable-docs --disable-tools --disable-user
     make -j3
     cd ..
