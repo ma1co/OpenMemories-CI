@@ -8,5 +8,5 @@ def writeEmmc(boot, data, size):
  f.write(b'\0' * (BOOT_SIZE - f.tell()))
  f.write(b'\0' * BOOT_SIZE)
  f.write(data)
- f.write(b'\xff' * (BOOT_SIZE + size - f.tell()))
+ f.write(b'\xff' * (2 * BOOT_SIZE + size - f.tell()))
  return f.getvalue()
