@@ -10,6 +10,9 @@ class SubprocessRunner:
   self.stdio = Pipe(self.p.stdout, self.p.stdin, logging.getLogger(name + '.stdio') if log else None, timeout)
   self.defaultPipe = self.stdio
 
+ def running(self):
+  return self.p.poll() is None
+
  def close(self):
   self.stdio.close()
 
