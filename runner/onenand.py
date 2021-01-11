@@ -6,10 +6,13 @@ SECTOR_SIZE = 0x200
 SPARE_SIZE = 0x10
 SECTORS_PER_BLOCK = 0x100
 
-def writeNand(boot, data, size):
+def writeNand(boot, data, size, maxFreeSpace=-1):
  numBlocks = size // SECTOR_SIZE // SECTORS_PER_BLOCK
  bootBlocks = (len(boot) + SECTORS_PER_BLOCK * SECTOR_SIZE - 1) // SECTOR_SIZE // SECTORS_PER_BLOCK
  dataBlocks = (len(data) + SECTORS_PER_BLOCK * SECTOR_SIZE - 1) // SECTOR_SIZE // SECTORS_PER_BLOCK
+ if maxFreeSpace >= 0:
+  freeBlocks = (maxFreeSpace + SECTORS_PER_BLOCK * SECTOR_SIZE - 1) // SECTOR_SIZE // SECTORS_PER_BLOCK
+  dataBlocks = max(dataBlocks, numBlocks - bootBlocks - freeBlocks)
 
  f = io.BytesIO()
  f.write(boot)

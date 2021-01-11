@@ -49,7 +49,7 @@ class TestCXD4108(TestCase):
   return archive.writeFat(nflasha2, 0x200000)
 
  def prepareNand(self, boot=b'', partitions=[]):
-  return onenand.writeNand(boot, archive.writeFlash(partitions), self.NAND_SIZE)
+  return onenand.writeNand(boot, archive.writeFlash(partitions), self.NAND_SIZE, 0x100000)
 
  def prepareQemuArgs(self, bootRom=None, kernel=None, initrd=None, nand=None):
   args = ['-icount', 'shift=4']
@@ -109,7 +109,7 @@ class TestCXD4108(TestCase):
   }
   args = self.prepareQemuArgs(nand='nand.dat')
 
-  with qemu.QemuRunner(self.MACHINE, args, files, timeout=45) as q:
+  with qemu.QemuRunner(self.MACHINE, args, files) as q:
    q.expectLine(lambda l: l.startswith('BusyBox'))
    time.sleep(.5)
    self.checkShell(q.execShellCommand)
