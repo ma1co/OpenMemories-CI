@@ -6,7 +6,7 @@ from fwtool.archive import cramfs, fat, UnixFile
 from fwtool.sony import flash
 
 class Archive:
- def __init__(self, files={}):
+ def __init__(self, files=[]):
   self.files = {f.path: f for f in files}
 
  def read(self, path):
