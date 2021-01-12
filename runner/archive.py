@@ -1,6 +1,7 @@
 import io
 import stat
 
+from fwtool import mbr
 from fwtool.archive import cramfs, fat, UnixFile
 from fwtool.sony import flash
 
@@ -39,4 +40,9 @@ def writeCramfs(archive):
 def writeFlash(partitions):
  f = io.BytesIO()
  flash.writePartitions([io.BytesIO(p) for p in partitions], f)
+ return f.getvalue()
+
+def writeMbr(partitions):
+ f = io.BytesIO()
+ mbr.writeMbr([io.BytesIO(p) for p in partitions], f)
  return f.getvalue()
