@@ -3,6 +3,7 @@ import logging
 import os
 import socket
 import tempfile
+import time
 from .subprocess import *
 
 class QemuRunner(SubprocessRunner):
@@ -23,8 +24,16 @@ class QemuRunner(SubprocessRunner):
   super().__init__(name='qemu-system-arm', args=['qemu-system-arm']+args, cwd=self.tempdir.name, timeout=timeout, log=False)
 
   self.serial = []
+  t = time.monotonic()
   for i in range(numSerial):
-   s = socket.create_connection(('127.0.0.1', self.SERIAL_PORT_BASE + i))
+   while True:
+    try:
+     s = socket.create_connection(('127.0.0.1', self.SERIAL_PORT_BASE + i))
+     break
+    except ConnectionError:
+     if time.monotonic() >= t + timeout:
+      raise
+     time.sleep(1)
    f = s.makefile('rw')
    s.close()
    self.serial.append(Pipe(f, f, logging.getLogger('qemu-system-arm.serial%d' % i), timeout))
@@ -41,7 +50,7 @@ class QemuRunner(SubprocessRunner):
  def finish(self):
   if self.running():
    self.stdio.writeLine(json.dumps({'execute': 'quit'}))
-  super().wait()
+  self.wait()
   self.tempdir.cleanup()
 
  def execQmpCommand(self, cmd, **kwargs):
