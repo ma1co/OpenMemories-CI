@@ -1,4 +1,5 @@
 import os
+from PIL import Image, ImageChops
 import textwrap
 import time
 import unittest
@@ -12,6 +13,7 @@ class TestCXD4108(TestCase):
 
  MODEL = 'DSC-W90'
  FIRMWARE_DIR = 'firmware/DSC-W90'
+ SCREENSHOT_DIR = 'screenshots/DSC-W90'
 
  def readFirmwareFile(self, name):
   with open(os.path.join(self.FIRMWARE_DIR, name), 'rb') as f:
@@ -90,6 +92,9 @@ class TestCXD4108(TestCase):
 
   # Battery auth
   args += ['-device', 'bionz_upd79f,id=upd79f,bus=/sio1', '-connect-gpio', 'odev=gpios,onum=4,idev=upd79f,iname=ssi-gpio-cs']
+
+  # Buttons
+  args += ['-device', 'bionz_buttons,bus=/adc0,keys0=druls,keys1=wtmh']
 
   if bootRom:
    args += ['-bios', bootRom]
@@ -195,6 +200,38 @@ class TestCXD4108(TestCase):
   args = self.prepareQemuArgs(bootRom='rom.dat', nand='nand.dat')
 
   with qemu.QemuRunner(self.MACHINE, args, files) as q:
+   def waitScreen():
+    q.execShellCommand('cat /dev/blog_fsk > /dev/null; until egrep \'^.{8}038504002b20627265774642446973706f73654269746d617000\' /dev/blog_fsk > /dev/null; do usleep 200000; done')
+    time.sleep(1)
+
+   def pressKey(key):
+    q.sendKey(key, True)
+    q.sendKey(key, False)
+    time.sleep(.5)
+
+   def checkScreen(fn):
+    im = q.screenshot()
+    path = os.path.join(self.SCREENSHOT_DIR, fn)
+    if ImageChops.difference(im, Image.open(path)).getbbox():
+     raise Exception('%s is different' % fn)
+
    q.expectLine(lambda l: l.startswith('BusyBox'))
-   time.sleep(.5)
-   self.checkShell(q.execShellCommand)
+   waitScreen()
+   checkScreen('clock.png')
+
+   pressKey('down')
+   pressKey('down')
+   pressKey('down')
+   pressKey('ret') # ok
+   waitScreen()
+   checkScreen('playback.png')
+
+   pressKey('h')
+   time.sleep(2)
+   checkScreen('home.png')
+   pressKey('h')
+
+   pressKey('m')
+   time.sleep(2)
+   checkScreen('menu.png')
+   pressKey('m')

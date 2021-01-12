@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from PIL import Image
 import socket
 import tempfile
 import time
@@ -60,5 +61,15 @@ class QemuRunner(SubprocessRunner):
 
  def execShellCommand(self, cmd):
   self.writeLine('\n%s\n' % cmd)
-  self.expectLine(lambda l: l == '/ # %s' % cmd)
+  self.expectLine(lambda l: l.replace(' \b', '') == '/ # %s' % cmd)
   return '\n'.join(iter(self.readLine, '/ # '))
+
+ def sendKey(self, key, down):
+  self.execQmpCommand('input-send-event', events=[
+   {'type': 'key', 'data': {'key': {'type': 'qcode', 'data': key}, 'down': down}},
+  ])
+
+ def screenshot(self):
+  fn = 'screen.ppm'
+  self.execQmpCommand('screendump', filename=fn)
+  return Image.open(os.path.join(self.tempdir.name, fn))
