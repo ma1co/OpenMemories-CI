@@ -44,5 +44,10 @@ before_script:
       openssl aes-256-cbc -d -k "$FIRMWARE_KEY" -in $f -out ${f%.enc}
     done
 
+  - |
+    # Download and extract firmware files
+    wget https://di.update.sony.net/DSC/DSCG3V2.exe -O firmware/DSCG3V2.exe
+    python fwtool/fwtool.py unpack -f firmware/DSCG3V2.exe -o firmware/DSC-G3
+
 script:
   - python -m unittest discover -q -t . -s tests

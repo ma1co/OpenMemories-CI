@@ -69,6 +69,17 @@ class QemuRunner(SubprocessRunner):
    {'type': 'key', 'data': {'key': {'type': 'qcode', 'data': key}, 'down': down}},
   ])
 
+ def sendMousePos(self, x, y):
+  self.execQmpCommand('input-send-event', events=[
+   {'type': 'abs', 'data': {'axis': 'x', 'value': int(x * 0x7fff)}},
+   {'type': 'abs', 'data': {'axis': 'y', 'value': int(y * 0x7fff)}},
+  ])
+
+ def sendMouseButton(self, down):
+  self.execQmpCommand('input-send-event', events=[
+   {'type': 'btn', 'data': {'button': 'left', 'down': down}},
+  ])
+
  def screenshot(self):
   fn = 'screen.ppm'
   self.execQmpCommand('screendump', filename=fn)

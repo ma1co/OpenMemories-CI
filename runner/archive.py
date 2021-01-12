@@ -2,7 +2,7 @@ import io
 import stat
 
 from fwtool import mbr
-from fwtool.archive import cramfs, fat, UnixFile
+from fwtool.archive import cramfs, fat, tar, UnixFile
 from fwtool.sony import flash
 
 class Archive:
@@ -21,6 +21,10 @@ class Archive:
  def patch(self, path, func):
   self.write(path, func(self.read(path)))
 
+ def writeAll(self, archive, path=''):
+  for f in archive.files.values():
+   self.files[path+f.path] = f._replace(path=path+f.path)
+
 def readFat(data):
  return Archive(fat.readFat(io.BytesIO(data)))
 
@@ -36,6 +40,9 @@ def writeCramfs(archive):
  f = io.BytesIO()
  cramfs.writeCramfs(archive.files.values(), f)
  return f.getvalue()
+
+def readTar(data):
+ return Archive(tar.readTar(io.BytesIO(data)))
 
 def writeFlash(partitions):
  f = io.BytesIO()
