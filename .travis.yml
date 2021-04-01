@@ -46,7 +46,9 @@ before_script:
 
   - |
     # Download and extract firmware files
-    wget https://di.update.sony.net/DSC/DSCG3V2.exe -O firmware/DSCG3V2.exe
+    wget -nv https://di.update.sony.net/DSC/DSCT100V2.exe -O firmware/DSCT100V2.exe
+    python fwtool/fwtool.py unpack -f firmware/DSCT100V2.exe -o firmware/DSC-T100
+    wget -nv https://di.update.sony.net/DSC/DSCG3V2.exe -O firmware/DSCG3V2.exe
     python fwtool/fwtool.py unpack -f firmware/DSCG3V2.exe -o firmware/DSC-G3
 
 script:

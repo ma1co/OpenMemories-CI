@@ -3,7 +3,6 @@ import os
 from PIL import Image, ImageChops
 import textwrap
 import time
-import unittest
 
 from . import TestCase
 from runner import archive, kernel_patch, onenand, qemu, zimage
@@ -63,7 +62,7 @@ class FirmwareUpdate(FirmwareDump):
     p.write('/%s' % f, self._readUpdateFile(f))
 
   elif i == 6:
-   for f in ['bin.tar', 'fskapp[1-9].tar', 'fskfnt.tar', 'fskrel[1-9].tar', 'lib.tar']:
+   for f in ['bin.tar', 'fskapp.tar', 'fskapp[1-9].tar', 'fskfnt.tar', 'fskrel[1-9].tar', 'lib.tar']:
     p.writeAll(self._readUpdateTar(f))
 
   else:
@@ -163,7 +162,6 @@ class TestCXD4108(TestCase):
 
 class TestDscW90(TestCXD4108):
  FIRMWARE_DIR = 'firmware/DSC-W90'
- SCREENSHOT_DIR = 'screenshots/DSC-W90'
 
  firmware = FirmwareDump(FIRMWARE_DIR)
 
@@ -251,7 +249,27 @@ class TestDscW90(TestCXD4108):
    self.checkShell(q.execShellCommand)
 
 
- @unittest.skip
+class TestDscT100(TestCXD4108):
+ FIRMWARE_DIR = 'firmware/DSC-T100'
+ FIRMWARE_DUMP_DIR = 'firmware/DSC-W90'
+ SCREENSHOT_DIR = 'screenshots/DSC-T100'
+
+ firmware = FirmwareUpdate(FIRMWARE_DIR, FIRMWARE_DUMP_DIR)
+
+ def prepareQemuArgs(self, bootRom=None, nand=None):
+  args = super().prepareQemuArgs(bootRom=bootRom, nand=nand)
+
+  # Power IC
+  args += ['-device', 'bionz_mb89083,id=mb89083,bus=/sio0', '-connect-gpio', 'odev=gpio1,onum=1,idev=mb89083,iname=ssi-gpio-cs']
+
+  # Battery auth
+  args += ['-device', 'bionz_upd79f,id=upd79f,bus=/sio1', '-connect-gpio', 'odev=gpios,onum=4,idev=upd79f,iname=ssi-gpio-cs']
+
+  # Buttons
+  args += ['-device', 'bionz_buttons,bus=/adc0,keys0=rluds,keys1=twhm']
+
+  return args
+
  def testLoader1Main(self):
   files = {
    'rom.dat': self.prepareBootRom(),
@@ -310,7 +328,6 @@ class TestDscW90(TestCXD4108):
    time.sleep(2)
    checkScreen('menu.png')
    pressKey('m')
-
 
 
 class TestDscG3(TestCXD4108):
