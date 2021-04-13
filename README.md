@@ -3,3 +3,21 @@
 [![Build Status](https://travis-ci.org/ma1co/OpenMemories-CI.svg?branch=master)](https://travis-ci.org/ma1co/OpenMemories-CI)
 
 This repository emulates several Sony cameras in [qemu](https://github.com/ma1co/qemu). The tests run automatically on [Travis CI](https://travis-ci.org/ma1co/OpenMemories-CI).
+
+## Screenshots
+
+### CXD4108
+
+#### DSC-T100
+<p>
+<img src="screenshots/DSC-T100/clock.png" width=240>
+<img src="screenshots/DSC-T100/playback.png" width=240>
+<img src="screenshots/DSC-T100/home.png" width=240>
+</p>
+
+#### DSC-G3
+<p>
+<img src="screenshots/DSC-G3/clock2.png" width=240>
+<img src="screenshots/DSC-G3/playback.png" width=240>
+<img src="screenshots/DSC-G3/home.png" width=240>
+</p>
