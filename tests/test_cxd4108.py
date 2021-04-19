@@ -343,7 +343,7 @@ class TestDscG3(TestCXD4108):
   args = super().prepareQemuArgs(bootRom=bootRom, nand=nand, mmc=mmc)
 
   # Power IC
-  args += ['-device', 'bionz_mb89083,id=mb89083,bus=/sio0', '-connect-gpio', 'odev=gpio1,onum=1,idev=mb89083,iname=ssi-gpio-cs']
+  args += ['-device', 'bionz_sc901572,id=sc901572,bus=/sio0', '-connect-gpio', 'odev=gpio1,onum=1,idev=sc901572,iname=ssi-gpio-cs']
 
   # Battery auth
   args += ['-device', 'bionz_upd79f,id=upd79f,bus=/sio1', '-connect-gpio', 'odev=gpios,onum=4,idev=upd79f,iname=ssi-gpio-cs']
