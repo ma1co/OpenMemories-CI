@@ -1,0 +1,49 @@
+name: CI
+on: push
+jobs:
+  Test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Install qemu
+      run: |
+        sudo apt-get install libjpeg-dev libmad0-dev
+        git clone --depth=1 https://github.com/ma1co/qemu.git qemu
+        cd qemu
+        ./configure --target-list=arm-softmmu --disable-docs --disable-tools --disable-user
+        make -j $(nproc)
+        echo "$PWD/arm-softmmu" >> $GITHUB_PATH
+    - name: Install fwtool
+      run: |
+        git clone --depth=1 https://github.com/ma1co/fwtool.py.git fwtool
+        cd fwtool
+        pip install -r requirements.txt
+        echo "PYTHONPATH=$PWD:$PYTHONPATH" >> $GITHUB_ENV
+    - name: Install pmca-re
+      run: |
+        git clone --depth=1 https://github.com/ma1co/Sony-PMCA-RE.git pmca
+        cd pmca
+        pip install -r requirements.txt
+        echo "PYTHONPATH=$PWD:$PYTHONPATH" >> $GITHUB_ENV
+    - name: Decrypt firmware files
+      run: |
+        for f in $(find firmware -type f -name '*.enc'); do
+          openssl aes-256-cbc -d -k "$FIRMWARE_KEY" -in $f -out ${f%.enc}
+        done
+      env:
+        FIRMWARE_KEY: ${{ secrets.FIRMWARE_KEY }}
+    - name: Download and extract firmware files
+      run: |
+        wget -nv https://di.update.sony.net/DSC/DSCT100V2.exe -O firmware/DSCT100V2.exe
+        python fwtool/fwtool.py unpack -f firmware/DSCT100V2.exe -o firmware/DSC-T100
+        wget -nv https://di.update.sony.net/DSC/DSCG3V2.exe -O firmware/DSCG3V2.exe
+        python fwtool/fwtool.py unpack -f firmware/DSCG3V2.exe -o firmware/DSC-G3
+    - name: Run tests
+      run: python -m unittest discover -q -t . -s tests

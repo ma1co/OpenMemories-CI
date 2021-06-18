@@ -1,8 +1,8 @@
 # OpenMemories: Continuous Integration
 
-[![Build Status](https://travis-ci.org/ma1co/OpenMemories-CI.svg?branch=master)](https://travis-ci.org/ma1co/OpenMemories-CI)
+[![Build Status](https://github.com/ma1co/OpenMemories-CI/actions/workflows/ci.yml/badge.svg)](https://github.com/ma1co/OpenMemories-CI/actions/workflows/ci.yml)
 
-This repository emulates several Sony cameras in [qemu](https://github.com/ma1co/qemu). The tests run automatically on [Travis CI](https://travis-ci.org/ma1co/OpenMemories-CI).
+This repository emulates several Sony cameras in [qemu](https://github.com/ma1co/qemu). The tests run automatically on GitHub Actions.
 
 ## Screenshots
 
