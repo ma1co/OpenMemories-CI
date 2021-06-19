@@ -177,7 +177,7 @@ class TestDscW90(TestCXD4108):
   args += ['-device', 'bionz_upd79f,id=upd79f,bus=/sio1', '-connect-gpio', 'odev=gpios,onum=4,idev=upd79f,iname=ssi-gpio-cs']
 
   # Buttons
-  args += ['-device', 'bionz_buttons,bus=/adc0,keys0=druls,keys1=wtmh']
+  args += ['-device', 'bionz_buttons,id=buttons,bus=/adc0,keys0=druls,keys1=wtmh,keys=p', '-connect-gpio', 'odev=buttons,idev=mb89083,iname=play']
 
   return args
 
@@ -268,7 +268,7 @@ class TestDscT100(TestCXD4108):
   args += ['-device', 'bionz_upd79f,id=upd79f,bus=/sio1', '-connect-gpio', 'odev=gpios,onum=4,idev=upd79f,iname=ssi-gpio-cs']
 
   # Buttons
-  args += ['-device', 'bionz_buttons,bus=/adc0,keys0=rluds,keys1=twhm']
+  args += ['-device', 'bionz_buttons,id=buttons,bus=/adc0,keys0=rluds,keys1=twhm,keys=p', '-connect-gpio', 'odev=buttons,idev=mb89083,iname=play']
 
   return args
 
@@ -350,7 +350,7 @@ class TestDscG3(TestCXD4108):
   args += ['-device', 'analog_voltage,id=batt_sens,bus=/adc0,channel=5,value=128']
 
   # Buttons
-  args += ['-device', 'bionz_buttons,bus=/adc0,keys0=twh']
+  args += ['-device', 'bionz_buttons,id=buttons,bus=/adc0,keys0=tw,keys=p', '-connect-gpio', 'odev=buttons,idev=sc901572,iname=play']
 
   # Touch panel
   args += ['-device', 'bionz_touch_panel,id=touch_panel,bus=/adc0', '-connect-gpio', 'odev=gpio3,onum=5,idev=touch_panel,inum=0', '-connect-gpio', 'odev=gpio3,onum=6,idev=touch_panel,inum=1']
