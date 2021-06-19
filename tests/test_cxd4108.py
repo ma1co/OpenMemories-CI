@@ -107,7 +107,7 @@ class TestCXD4108(TestCase):
    nflasha1.write('/boot/initrd.img', initrd)
   return archive.writeFat(nflasha1, 0x200000)
 
- def prepareFlash2(self, readSettings=False, updaterMode=False, playbackMode=False, patchTouchscreenEnable=False, ntscOnly=False):
+ def prepareFlash2(self, readSettings=False, updaterMode=False, playbackMode=False, patchTouchscreenEnable=False, patchLensCoverEnable=False, ntscOnly=False):
   nflasha2 = archive.Archive()
   if readSettings:
    settings = self.firmware.getPartition(2)
@@ -120,6 +120,8 @@ class TestCXD4108(TestCase):
    nflasha2.patch('/factory/Areg.bin', lambda d: d[:0x100] + b'\x84' + d[0x101:])
   if patchTouchscreenEnable:
    nflasha2.patch('/factory/Asys.bin', lambda d: d[:0x2a5] + b'\x01' + d[0x2a6:])
+  if patchLensCoverEnable:
+   nflasha2.patch('/factory/Asys.bin', lambda d: d[:0x2a6] + b'\x01' + d[0x2a7:])
   if ntscOnly:
    nflasha2.patch('/factory/Hreg.bin', lambda d: d[:0x400] + b'\x02' + d[0x401:])
   return archive.writeFat(nflasha2, 0x180000)
@@ -279,7 +281,7 @@ class TestDscT100(TestCXD4108):
     boot=self.prepareBootPartition(),
     partitions=[
      b'',
-     self.prepareFlash2(readSettings=True, playbackMode=True, ntscOnly=True),
+     self.prepareFlash2(readSettings=True, patchLensCoverEnable=True, playbackMode=True, ntscOnly=True),
      self.prepareFlash3(kernel=self.prepareMainKernel(patchConsoleEnable=True)),
      b'',
      self.prepareFlash5(),
