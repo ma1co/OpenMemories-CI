@@ -162,7 +162,7 @@ class TestCXD90014(TestCase):
    q.expectLine(lambda l: l.endswith('"DONE onEvent(COMP_START or COMP_STOP)"'))
 
    with usb.PmcaRunner('updatershell', ['-d', 'qemu', '-m', self.MODEL]) as pmca:
-    pmca.expectLine(lambda l: l == 'Welcome to the USB debug shell.')
+    pmca.expectLine(lambda l: l == 'Welcome to USB debug shell.')
     self.checkShell(lambda c: pmca.execUpdaterShellCommand('shell %s' % c))
     pmca.writeLine('exit')
     pmca.expectLine(lambda l: l == '>Done')
