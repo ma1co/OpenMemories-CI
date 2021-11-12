@@ -12,12 +12,12 @@ This repository emulates several Sony cameras in [qemu](https://github.com/ma1co
 <p>
 <img src="screenshots/DSC-T100/clock.png" width=240>
 <img src="screenshots/DSC-T100/playback.png" width=240>
-<img src="screenshots/DSC-T100/home.png" width=240>
+<img src="screenshots/DSC-T100/playback_home.png" width=240>
 </p>
 
 #### DSC-G3
 <p>
 <img src="screenshots/DSC-G3/clock2.png" width=240>
 <img src="screenshots/DSC-G3/playback.png" width=240>
-<img src="screenshots/DSC-G3/home.png" width=240>
+<img src="screenshots/DSC-G3/playback_home.png" width=240>
 </p>

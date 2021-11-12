@@ -107,7 +107,7 @@ class TestCXD4108(TestCase):
    nflasha1.write('/boot/initrd.img', initrd)
   return archive.writeFat(nflasha1, 0x200000)
 
- def prepareFlash2(self, readSettings=False, updaterMode=False, playbackMode=False, patchTouchscreenEnable=False, patchLensCoverEnable=False, ntscOnly=False):
+ def prepareFlash2(self, readSettings=False, updaterMode=False, patchTouchscreenEnable=False, patchLensCoverEnable=False, ntscOnly=False):
   nflasha2 = archive.Archive()
   if readSettings:
    settings = self.firmware.getPartition(2)
@@ -116,8 +116,6 @@ class TestCXD4108(TestCase):
      nflasha2.write(fn, settings.read(fn))
   if updaterMode:
    nflasha2.write('/updater/mode', b'')
-  if playbackMode:
-   nflasha2.patch('/factory/Areg.bin', lambda d: d[:0x100] + b'\x84' + d[0x101:])
   if patchTouchscreenEnable:
    nflasha2.patch('/factory/Asys.bin', lambda d: d[:0x2a5] + b'\x01' + d[0x2a6:])
   if patchLensCoverEnable:
@@ -144,7 +142,7 @@ class TestCXD4108(TestCase):
 
  def prepareFlash11(self):
   nflasha11 = archive.Archive()
-  return archive.writeMbr([archive.writeFat(nflasha11, 0x7ffe00)])
+  return archive.writeMbr([archive.writeFat(nflasha11, 0xfffe00)])
 
  def prepareNand(self, boot=b'', partitions=[]):
   return onenand.writeNand(boot, archive.writeFlash(partitions), self.NAND_SIZE, 0x100000)
@@ -281,7 +279,7 @@ class TestDscT100(TestCXD4108):
     boot=self.prepareBootPartition(),
     partitions=[
      b'',
-     self.prepareFlash2(readSettings=True, patchLensCoverEnable=True, playbackMode=True, ntscOnly=True),
+     self.prepareFlash2(readSettings=True, patchLensCoverEnable=True, ntscOnly=True),
      self.prepareFlash3(kernel=self.prepareMainKernel(patchConsoleEnable=True)),
      b'',
      self.prepareFlash5(),
@@ -296,7 +294,7 @@ class TestDscT100(TestCXD4108):
   }
   args = self.prepareQemuArgs(bootRom='rom.dat', nand='nand.dat')
 
-  with qemu.QemuRunner(self.MACHINE, args, files) as q:
+  with qemu.QemuRunner(self.MACHINE, args, files, timeout=20) as q:
    def waitScreen():
     q.execShellCommand('cat /dev/blog_fsk > /dev/null; until egrep \'^.{8}038504002b20627265774642446973706f73654269746d617000\' /dev/blog_fsk > /dev/null; do usleep 200000; done')
     time.sleep(1)
@@ -306,10 +304,14 @@ class TestDscT100(TestCXD4108):
     q.sendKey(key, False)
     time.sleep(.5)
 
-   def checkScreen(fn):
-    im = q.screenshot()
-    path = os.path.join(self.SCREENSHOT_DIR, fn)
-    if ImageChops.difference(im, Image.open(path)).getbbox():
+   def checkScreen(fn, retries=0):
+    for i in range(retries + 1):
+     im = q.screenshot()
+     path = os.path.join(self.SCREENSHOT_DIR, fn)
+     if not ImageChops.difference(im, Image.open(path)).getbbox():
+      break
+     time.sleep(.25)
+    else:
      raise Exception('%s is different' % fn)
 
    q.expectLine(lambda l: l.startswith('BusyBox'))
@@ -321,16 +323,36 @@ class TestDscT100(TestCXD4108):
    pressKey('down')
    pressKey('ret') # ok
    waitScreen()
-   checkScreen('playback.png')
+   checkScreen('camera.png', retries=10)
 
    pressKey('h')
    time.sleep(2)
-   checkScreen('home.png')
+   checkScreen('camera_home.png')
    pressKey('h')
 
    pressKey('m')
    time.sleep(2)
-   checkScreen('menu.png')
+   checkScreen('camera_menu.png')
+   pressKey('m')
+
+   pressKey('p')
+   waitScreen()
+   checkScreen('playback.png')
+
+   pressKey('h')
+   time.sleep(2)
+   checkScreen('playback_home.png')
+   pressKey('right')
+   pressKey('right')
+   pressKey('right')
+   pressKey('ret') # main settings
+   time.sleep(1)
+   checkScreen('setup.png')
+   pressKey('h')
+
+   pressKey('m')
+   time.sleep(2)
+   checkScreen('playback_menu.png')
    pressKey('m')
 
 
@@ -367,7 +389,7 @@ class TestDscG3(TestCXD4108):
     boot=self.prepareBootPartition(),
     partitions=[
      b'',
-     self.prepareFlash2(readSettings=True, patchTouchscreenEnable=True, playbackMode=True, ntscOnly=True),
+     self.prepareFlash2(readSettings=True, patchTouchscreenEnable=True, ntscOnly=True),
      self.prepareFlash3(kernel=self.prepareMainKernel(patchConsoleEnable=True)),
      b'',
      self.prepareFlash5(),
@@ -383,16 +405,25 @@ class TestDscG3(TestCXD4108):
     q.execShellCommand('cat /dev/blog_fsk > /dev/null; until egrep \'^.{16}0485040000000003\' /dev/blog_fsk > /dev/null; do usleep 200000; done')
     time.sleep(1)
 
+   def pressKey(key):
+    q.sendKey(key, True)
+    q.sendKey(key, False)
+    time.sleep(.5)
+
    def click(x, y):
     q.sendMousePos(x, y)
     q.sendMouseButton(True)
     q.sendMouseButton(False)
-    time.sleep(1)
+    time.sleep(1.5)
 
-   def checkScreen(fn):
-    im = q.screenshot()
-    path = os.path.join(self.SCREENSHOT_DIR, fn)
-    if ImageChops.difference(im, Image.open(path)).getbbox():
+   def checkScreen(fn, retries=0):
+    for i in range(retries + 1):
+     im = q.screenshot()
+     path = os.path.join(self.SCREENSHOT_DIR, fn)
+     if not ImageChops.difference(im, Image.open(path)).getbbox():
+      break
+     time.sleep(.25)
+    else:
      raise Exception('%s is different' % fn)
 
    q.expectLine(lambda l: l.startswith('BusyBox'))
@@ -404,12 +435,30 @@ class TestDscG3(TestCXD4108):
 
    click(.5, .9) # ok
    waitScreen()
-   checkScreen('playback.png')
+   checkScreen('camera.png', retries=10)
 
    click(.1, .1) # home
-   checkScreen('home.png')
+   checkScreen('camera_home.png')
    click(.9, .1) # close
 
    click(.1, .9) # menu
-   checkScreen('menu.png')
+   checkScreen('camera_menu.png')
+   click(.9, .1) # close
+
+   pressKey('p')
+   waitScreen()
+   checkScreen('playback.png')
+
+   click(.1, .1) # home
+   checkScreen('playback_home.png')
+   click(.9, .9) # toolbox
+   click(.3, .3) # main settings
+   click(.8, .1) # ok
+   time.sleep(1)
+   checkScreen('setup.png')
+   click(.9, .1) # back
+   click(.9, .1) # close
+
+   click(.1, .9) # menu
+   checkScreen('playback_menu.png')
    click(.9, .1) # close
